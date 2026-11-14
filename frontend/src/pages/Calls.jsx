@@ -21,6 +21,7 @@ export default function Calls() {
       if (statusF !== "All") params.status    = statusF;
       if (sentimentF !== "All") params.sentiment = sentimentF;
       const data = await api.calls(params);
+      console.log("PARAMS:", params);
       setCalls(data);
     } catch (e) {
       toast.error("Failed to load calls: " + e.message);
@@ -79,9 +80,9 @@ export default function Calls() {
         <select value={sentimentF} onChange={e => setSentF(e.target.value)}
           className="bg-white/[0.04] border border-white/[0.08] px-4 py-2.5 rounded-xl outline-none text-sm text-slate-300 focus:border-[#00d4ff]/40">
           <option value="All">All Sentiments</option>
-          <option value="Supporter">Supporter</option>
+          <option value="Positive">Supporter</option>
           <option value="Neutral">Neutral</option>
-          <option value="Opposed">Opposed</option>
+          <option value="Negative">Opposed</option>
         </select>
         <span className="text-xs text-slate-500 ml-auto">{calls.length} result{calls.length !== 1 ? "s" : ""}</span>
       </div>
@@ -104,7 +105,9 @@ export default function Calls() {
                   ? <tr><td colSpan={6} className="text-center py-12 text-slate-500 text-sm">No calls found</td></tr>
                   : calls.map((call, i) => (
                     <motion.tr key={call.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                      onClick={() => setSelected(call)}
+                      onClick={() => {
+                        console.log("CALL DATA:", call);
+                        setSelected(call);}}
                       className={`border-b border-white/[0.04] cursor-pointer transition-colors ${selected?.id === call.id ? "bg-[#00d4ff]/5" : "hover:bg-white/[0.02]"}`}>
                       <td className="px-4 py-3 text-sm font-medium text-white">{call.name}</td>
                       <td className="px-4 py-3"><span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${STATUS_BADGE[call.status] || "text-slate-400"}`}>{call.status}</span></td>

@@ -13,11 +13,13 @@
 # Relationships let us do call_log.voter to get the voter object directly.
 # =============================================================================
 
+from groq import BaseModel
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Float,
     Boolean, ForeignKey, JSON, Enum as SAEnum, Index
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy import ForeignKey
 from sqlalchemy.sql import func
 import enum
 
@@ -32,6 +34,8 @@ from app.database import Base
 # This prevents typos like "Completed" vs "completed" from slipping in.
 class ContactStatus(str, enum.Enum):
     pending            = "pending"            # Not called yet (default)
+    called             = "called"
+    in_progress = "in_progress"
     completed          = "completed"          # Call connected and finished
     no_answer          = "no_answer"          # Phone rang, nobody picked up
     busy               = "busy"              # Line was busy
@@ -71,7 +75,7 @@ class Voter(Base):
     )
     # Basic contact info
     name          = Column(String(200), nullable=False)
-    phone         = Column(String(20), unique=True, nullable=False, index=True)
+    phone         = Column(String(20),nullable=False, index=True)
     # unique=True: no two voters can share a phone number
     # index=True: makes lookups by phone fast
 
@@ -107,6 +111,7 @@ class Voter(Base):
     # back_populates="voter" means CallLog also has a .voter relationship pointing back.
     call_logs = relationship("CallLog", back_populates="voter", lazy="select")
     campaign = relationship("Campaign", back_populates="voters")
+
     def __repr__(self):
         return f"<Voter id={self.id} name={self.name} phone={self.phone} status={self.status}>"
 
@@ -125,6 +130,7 @@ class Campaign(Base):
     )
 
     id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column( Integer, ForeignKey("admin_users.id") )
     
     name        = Column(String(300), nullable=False)
 
@@ -156,6 +162,7 @@ class Campaign(Base):
     # Relationships — one campaign has many call logs
     call_logs = relationship("CallLog", back_populates="campaign", lazy="select")
     voters = relationship("Voter", back_populates="campaign")
+    user = relationship( "User", back_populates="campaigns" )
 
     def __repr__(self):
         return f"<Campaign id={self.id} name={self.name} status={self.status}>"
@@ -308,3 +315,91 @@ class AnalysisResult(Base):
 
     def __repr__(self):
         return f"<AnalysisResult call={self.call_id} sentiment={self.sentiment} confidence={self.confidence}>"
+    
+    
+class User(Base):
+    __tablename__ = "admin_users"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+    email = Column(
+        String,
+        unique=True,
+        index=True,
+        nullable=False
+    )
+
+    hashed_password = Column(
+    String,
+    nullable=False
+    )
+    campaigns = relationship(
+    "Campaign",
+    back_populates="user"
+    )
+
+    settings = relationship(
+    "UserSettings",
+    back_populates="user",
+    uselist=False
+)
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("admin_users.id"),
+        unique=True
+    )
+
+    twilio_sid = Column(String)
+    twilio_token = Column(String)
+    twilio_phone = Column(String)
+
+    groq_key = Column(String)
+    groq_model = Column(String)
+
+    default_script = Column(Text)
+    voice = Column(
+    String,
+    default="Polly.Aditi"
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now()
+    )
+
+    user = relationship(
+    "User",
+    back_populates="settings"
+    )
+
+class SettingsSave(BaseModel):
+    twilio_sid: str
+    twilio_token: str
+    twilio_phone: str
+
+    groq_key: str
+    groq_model: str
+
+    script: str
+

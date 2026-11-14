@@ -11,7 +11,7 @@ import { Toaster } from "react-hot-toast";
 
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-
+import CampaignHistory from "./pages/CampaignHistory";
 import Dashboard from "./pages/Dashboard";
 import Campaigns from "./pages/Campaigns";
 import Calls from "./pages/Calls";
@@ -19,15 +19,42 @@ import Analytics from "./pages/Analytics";
 import Agent from "./pages/Agent";
 import Settings from "./pages/Settings";
 
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+
+/* =========================
+   PROTECTED ROUTE
+========================= */
+
+function ProtectedRoute({ children }) {
+
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+}
+
+/* =========================
+   MAIN DASHBOARD LAYOUT
+========================= */
+
 function Layout() {
+
   const [open, setOpen] = useState(false);
 
   return (
+
     <div className="flex bg-[#060B14] text-white min-h-screen">
 
       {/* Sidebar */}
 
-      <Sidebar open={open} setOpen={setOpen} />
+      <Sidebar
+        open={open}
+        setOpen={setOpen}
+      />
 
       {/* Main Content */}
 
@@ -72,8 +99,9 @@ function Layout() {
               path="/settings"
               element={<Settings />}
             />
+            <Route path="/campaign-history" element={<CampaignHistory />} />
 
-            {/* Default Route */}
+            {/* Default */}
 
             <Route
               path="*"
@@ -90,8 +118,14 @@ function Layout() {
   );
 }
 
+/* =========================
+   APP
+========================= */
+
 export default function App() {
+
   return (
+
     <BrowserRouter>
 
       <Toaster
@@ -106,8 +140,35 @@ export default function App() {
         }}
       />
 
-      <Layout />
+      <Routes>
+
+        {/* PUBLIC ROUTES */}
+
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/signup"
+          element={<Signup />}
+        />
+
+        {/* PROTECTED ROUTES */}
+
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        />
+
+      </Routes>
 
     </BrowserRouter>
   );
 }
+
+

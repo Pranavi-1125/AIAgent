@@ -14,7 +14,7 @@
 # Pydantic schemas = API structure
 # =============================================================================
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -275,3 +275,56 @@ class APIResponse(BaseModel):
     success: bool
 
     message: str
+
+
+class SignupSchema(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
+class LoginSchema(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+
+    class Config:
+        from_attributes = True
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+# =============================================================================
+#  SETTINGS SCHEMAS
+# =============================================================================
+
+class SettingsSave(BaseModel):
+    twilio_sid: str
+    twilio_token: str
+    twilio_phone: str
+
+    groq_key: str
+    groq_model: str
+
+    script: str
+
+    voice: str
+
+class SettingsResponse(BaseModel):
+    twilio_sid: str | None = None
+    twilio_token: str | None = None
+    twilio_phone: str | None = None
+
+    groq_key: str | None = None
+    groq_model: str | None = None
+
+    script: str | None = None
+    voice: str | None = None

@@ -1,11 +1,37 @@
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+const BASE =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8000";
 
 async function req(path, opts = {}) {
-  const r = await fetch(`${BASE}${path}`, opts);
+
+  const token = localStorage.getItem("token");
+
+  const r = await fetch(`${BASE}${path}`, {
+
+    ...opts,
+
+    headers: {
+      "Content-Type": "application/json",
+
+      ...(token && {
+        Authorization: `Bearer ${token}`
+      }),
+
+      ...(opts.headers || {}),
+    },
+  });
+
   if (!r.ok) {
-    const txt = await r.text().catch(() => r.statusText);
-    throw new Error(txt || `HTTP ${r.status}`);
+
+    const txt = await r.text()
+      .catch(() => r.statusText);
+
+    throw new Error(
+      txt || `HTTP ${r.status}`
+    );
   }
+
   return r.json();
 }
 
@@ -46,6 +72,25 @@ export const api = {
   }),
   testTwilio: () => req("/settings/test-twilio", { method: "POST" }),
   testGroq:   () => req("/settings/test-groq",   { method: "POST" }),
+
+    // Authentication
+  signup: (body) =>
+    req("/auth/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }),
+
+  login: (body) =>
+    req("/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }),
 };
 
 export const WS_URL = BASE.replace(/^http/, "ws") + "/ws";

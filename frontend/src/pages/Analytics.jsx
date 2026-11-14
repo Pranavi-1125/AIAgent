@@ -10,7 +10,6 @@ import { SENT_COLORS, INTENT_COLORS } from "../data/data";
 import { api } from "../api";
 
 export default function Analytics() {
-  const [range,      setRange]     = useState("week");
   const [stats,      setStats]     = useState(null);
   const [sentiment,  setSentiment] = useState([]);
   const [intent,     setIntent]    = useState([]);
@@ -18,14 +17,14 @@ export default function Analytics() {
   const [trends,     setTrends]    = useState([]);
   const [loading,    setLoading]   = useState(true);
 
-  async function load(r = range) {
+  async function load() {
     try {
       const [s, sent, int_, iss, tr] = await Promise.all([
         api.analyticsStats(),
         api.analyticsSentiment(),
         api.analyticsIntent(),
         api.analyticsIssues(),
-        api.analyticsTrends(r),
+        api.analyticsTrends(),
       ]);
       setStats(s);
       setSentiment(sent);
@@ -39,7 +38,7 @@ export default function Analytics() {
     }
   }
 
-  useEffect(() => { load(range); }, [range]);
+  useEffect(() => { load(); }, []);
 
   const exportReport = () => {
     window.open(api.exportCallsCSV(), "_blank");
@@ -56,15 +55,6 @@ export default function Analytics() {
           <p className="text-sm text-slate-500 mt-0.5">Sentiment, intent & issue analysis</p>
         </div>
         <div className="flex gap-3">
-          <div className="flex bg-white/[0.04] border border-white/[0.08] rounded-xl p-1">
-            {["week","month"].map(r => (
-              <button key={r} onClick={() => setRange(r)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize
-                ${range === r ? "bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/20" : "text-slate-500 hover:text-white"}`}>
-                This {r.charAt(0).toUpperCase() + r.slice(1)}
-              </button>
-            ))}
-          </div>
           <button onClick={exportReport}
             className="px-4 py-2 text-sm rounded-xl border border-white/[0.08] text-slate-300 hover:border-[#00d4ff]/40 hover:text-[#00d4ff] transition-all">
             ⬇ Export

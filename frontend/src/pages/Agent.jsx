@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Mic, Bot, AudioWaveform, PhoneCall, PhoneOff,
-  ArrowUpRight, Play, Pause, Volume2,
+  Mic, Bot, AudioWaveform, PhoneCall,   ArrowUpRight, 
+  // PhoneOff, Play, Pause, Volume2,
 } from "lucide-react";
 import StatCard from "../components/StatCard";
 import { api, WS_URL } from "../api";
@@ -10,13 +10,48 @@ import { api, WS_URL } from "../api";
 const fmt = n => Intl.NumberFormat().format(n);
 
 export default function Agent() {
-  const [live,      setLive]      = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [volume,    setVolume]    = useState(78);
-  const [messages,  setMessages]  = useState([]);
+  // const [live,      setLive]      = useState(false);
+  // const [recording, setRecording] = useState(false);
+  // const [volume,    setVolume]    = useState(78);
+  // const [messages,  setMessages]  = useState([]);
+
+  const [messages, setMessages] = useState(() => {
+  const saved = localStorage.getItem("campaign_messages");
+  return saved ? JSON.parse(saved) : [];
+});
+
+useEffect(() => {
+  localStorage.setItem(
+    "campaign_messages",
+    JSON.stringify(messages)
+  );
+}, [messages]);
+
   const [wsStatus,  setWsStatus]  = useState("disconnected");
-  const [lastSent,  setLastSent]  = useState(null);
-  const [lastResp,  setLastResp]  = useState(null);
+  const [lastSent, setLastSent] = useState(() => {
+  return localStorage.getItem("lastSent") || null;
+});
+
+const [lastResp, setLastResp] = useState(() => {
+  const saved = localStorage.getItem("lastResp");
+  return saved ? JSON.parse(saved) : null;
+});
+
+useEffect(() => {
+  if (lastSent) {
+    localStorage.setItem("lastSent", lastSent);
+  }
+}, [lastSent]);
+
+useEffect(() => {
+  if (lastResp) {
+    localStorage.setItem(
+      "lastResp",
+      JSON.stringify(lastResp)
+    );
+  }
+}, [lastResp]);
+
   const [stats,     setStats]     = useState(null);
 
   const chatRef = useRef(null);
@@ -33,14 +68,25 @@ export default function Agent() {
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 
-      ws.onopen  = () => setWsStatus("connected");
+      ws.onopen  = () => {
+        console.log("WS OPEN");
+        setWsStatus("connected");
+        const pingInterval = setInterval(() => {if (ws.readyState === WebSocket.OPEN) {ws.send("ping");}}, 30000);
+        ws.pingInterval = pingInterval;
+        ws.send(JSON.stringify({
+  type: "subscribe",
+  page: "agent"
+}))
+      };
       ws.onclose = () => {
+        console.log("WS CLOSED");
         setWsStatus("disconnected");
         setTimeout(connect, 3000); // auto-reconnect
       };
       ws.onerror = () => setWsStatus("error");
 
       ws.onmessage = (evt) => {
+        console.log("WS MESSAGE", evt.data);
         try {
           const data = JSON.parse(evt.data);
           if (data.type === "transcript") {
@@ -52,11 +98,16 @@ export default function Agent() {
           } else if (data.type === "status") {
             setMessages(m => [...m, { role: "System", text: data.message, ts: new Date() }]);
           }
-        } catch {}
+        } catch (error) {
+          console.error(error);
+        }
       };
     };
     connect();
-    return () => wsRef.current?.close();
+    return () => {
+  clearInterval(wsRef.current?.pingInterval);
+  wsRef.current?.close();
+};
   }, []);
 
   useEffect(() => {
@@ -96,51 +147,44 @@ export default function Agent() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* LEFT PANEL */}
         <div className="xl:col-span-2 bg-[#0d1520] border border-white/[0.08] rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-white">Live AI Calling</h2>
-              <p className="text-slate-400 text-sm mt-1">Real-time voice interaction panel</p>
-            </div>
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-full border ${live ? "bg-emerald-500/10 border-emerald-500/20" : "bg-white/[0.04] border-white/10"}`}>
-              <span className={`w-2 h-2 rounded-full ${live ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`}/>
-              <span className={`text-xs font-semibold ${live ? "text-emerald-400" : "text-slate-400"}`}>{live ? "LIVE" : "IDLE"}</span>
-            </div>
+          
+              {/* LIVE CHAT */}
+      <div className="bg-[#0d1520] border border-white/[0.08] rounded-3xl p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Live Conversation</h2>
+            <p className="text-slate-400 text-sm mt-1">Real-time AI interaction transcript via WebSocket</p>
           </div>
+          <button onClick={() => setMessages([])} className="text-xs text-slate-500 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 transition-all">Clear</button>
+        </div>
 
-          {/* WAVEFORM */}
-          <div className="h-52 rounded-2xl bg-gradient-to-br from-[#111827] to-[#0f172a] border border-white/[0.05] flex items-center justify-center mb-6 overflow-hidden relative">
-            <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_#00d4ff,_transparent_70%)]"/>
-            <div className="flex items-end gap-2 h-24">
-              {[35,55,70,40,90,65,45,80,60,30].map((h, i) => (
-                <motion.div key={i}
-                  animate={{ height: live ? [20, h, 35] : [20, 22, 20] }}
-                  transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.08 }}
-                  className="w-3 rounded-full bg-gradient-to-t from-[#00d4ff] to-violet-500"/>
-              ))}
-            </div>
-          </div>
+        <div ref={chatRef} className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
+          {messages.length === 0
+            ? <p className="text-slate-500 text-sm text-center py-12">Waiting for live events… (WebSocket {wsStatus})</p>
+            : <AnimatePresence>
+                {messages.map((msg, i) => (
+                  <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className={`flex ${msg.role === "AI" || msg.role === "System" ? "justify-start" : "justify-end"}`}>
+                    <div className={`max-w-[75%] rounded-2xl px-4 py-3 border ${
+                      msg.role === "AI"     ? "bg-[#00d4ff]/10 border-[#00d4ff]/20 text-cyan-100" :
+                      msg.role === "System" ? "bg-white/[0.03] border-white/[0.08] text-slate-400" :
+                                             "bg-violet-500/10 border-violet-500/20 text-violet-100"
+                    }`}>
+                      <p className="text-xs font-bold mb-1 opacity-70">{msg.role}</p>
+                      <p className="text-sm leading-relaxed">{msg.text}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+          }
+        </div>
+      </div>
 
-          {/* CONTROLS */}
-          <div className="flex flex-wrap gap-4 items-center justify-center">
-            <button onClick={() => setLive(!live)}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 ${live ? "bg-red-500 text-white" : "bg-[#00d4ff] text-black"}`}>
-              {live ? <PhoneOff size={18}/> : <PhoneCall size={18}/>}
-              {live ? "End Call" : "Start Call"}
-            </button>
-            <button onClick={() => setRecording(!recording)}
-              className={`px-5 py-3 rounded-xl border border-white/10 bg-white/[0.04] text-white flex items-center gap-2 ${recording ? "ring-2 ring-red-500" : ""}`}>
-              <Mic size={18}/>{recording ? "Recording…" : "Mic"}
-            </button>
-          </div>
 
-          {/* VOLUME */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 text-slate-300"><Volume2 size={16}/><span className="text-sm">Voice Volume</span></div>
-              <span className="text-sm text-[#00d4ff] font-semibold">{volume}%</span>
-            </div>
-            <input type="range" min="0" max="100" value={volume} onChange={e => setVolume(e.target.value)} className="w-full accent-cyan-400"/>
-          </div>
+
+
+
+
         </div>
 
         {/* RIGHT PANEL — Live Groq results */}
@@ -187,37 +231,9 @@ export default function Agent() {
         </div>
       </div>
 
-      {/* LIVE CHAT */}
-      <div className="bg-[#0d1520] border border-white/[0.08] rounded-3xl p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Live Conversation</h2>
-            <p className="text-slate-400 text-sm mt-1">Real-time AI interaction transcript via WebSocket</p>
-          </div>
-          <button onClick={() => setMessages([])} className="text-xs text-slate-500 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 transition-all">Clear</button>
-        </div>
+  
 
-        <div ref={chatRef} className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
-          {messages.length === 0
-            ? <p className="text-slate-500 text-sm text-center py-12">Waiting for live events… (WebSocket {wsStatus})</p>
-            : <AnimatePresence>
-                {messages.map((msg, i) => (
-                  <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className={`flex ${msg.role === "AI" || msg.role === "System" ? "justify-start" : "justify-end"}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-4 py-3 border ${
-                      msg.role === "AI"     ? "bg-[#00d4ff]/10 border-[#00d4ff]/20 text-cyan-100" :
-                      msg.role === "System" ? "bg-white/[0.03] border-white/[0.08] text-slate-400" :
-                                             "bg-violet-500/10 border-violet-500/20 text-violet-100"
-                    }`}>
-                      <p className="text-xs font-bold mb-1 opacity-70">{msg.role}</p>
-                      <p className="text-sm leading-relaxed">{msg.text}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-          }
-        </div>
-      </div>
+
     </div>
   );
 }

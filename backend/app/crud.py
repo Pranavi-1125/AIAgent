@@ -10,13 +10,15 @@
 # Every function takes `db: Session` as the first argument.
 # `db` is injected by FastAPI's Depends(get_db) — we never create sessions here.
 # =============================================================================
-
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from typing import Optional, List
 import datetime
 
-from app.models import Voter, Campaign, CallLog, Interaction, AnalysisResult, ContactStatus
+from app.models import CampaignStatus, Voter, Campaign, CallLog, Interaction, AnalysisResult, ContactStatus
+from app.models import User
+from app.auth import hash_password
 
 
 # =============================================================================
@@ -59,12 +61,12 @@ def get_next_pending_voter(db: Session, campaign_id: int) -> Optional[Voter]:
     entry for this specific campaign.
     """
     # Subquery: voter IDs that already have a call attempt in this campaign
-    already_called = db.query(CallLog.voter_id).filter(
+    already_called = select(CallLog.voter_id).where(
         CallLog.campaign_id == campaign_id
-    ).subquery()
-
+    )
     # Find first pending voter not in the already_called list
     voter = db.query(Voter).filter(
+        Voter.campaign_id == campaign_id,
         Voter.status == ContactStatus.pending,
         Voter.consent == True,
         ~Voter.id.in_(already_called)  # ~ means NOT IN
@@ -128,7 +130,7 @@ def start_campaign(db: Session, campaign_id: int) -> Campaign:
     if not campaign:
         raise ValueError(f"Campaign {campaign_id} not found")
 
-    campaign.status = "running"
+    campaign.status = CampaignStatus.running
     campaign.started_at = datetime.datetime.utcnow()
     db.commit()
     db.refresh(campaign)
@@ -141,7 +143,7 @@ def end_campaign(db: Session, campaign_id: int) -> Campaign:
     if not campaign:
         raise ValueError(f"Campaign {campaign_id} not found")
 
-    campaign.status = "completed"
+    campaign.status = CampaignStatus.completed
     campaign.ended_at = datetime.datetime.utcnow()
     db.commit()
     db.refresh(campaign)
@@ -388,3 +390,34 @@ def get_dashboard_summary(db: Session, campaign_id: int = None) -> dict:
         "sentiment":        sentiment,
         "top_issues":       top_issues
     }
+
+
+
+def create_user(
+    db,
+    name: str,
+    email: str,
+    password: str
+):
+
+    user = User(
+        name=name,
+        email=email,
+        hashed_password=password
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+def get_user_by_email(
+    db,
+    email: str
+):
+    return (
+        db.query(User)
+        .filter(User.email == email)
+        .first()
+    )

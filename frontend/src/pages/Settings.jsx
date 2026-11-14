@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Save } from "lucide-react";
 import { toast } from "react-hot-toast";   // ← WAS MISSING
 import {
-  Toggle,
   PasswordField,
   InputField,
 } from "../components/StatCard";
@@ -10,23 +9,44 @@ import {
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function SettingsPage() {
-  const [twilio, setTwilio] = useState({ sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", token: "", phone: "+1 555 000 0000" });
-  const [groq, setGroq]     = useState({ key: "gsk_xxxxxxxxxxxxxxxxxxxx", model: "llama3-70b-8192" });
-  const [stt, setStt]       = useState("Google Whisper");
-  const [tts, setTts]       = useState("Google Sarvam");
-  const [script, setScript] = useState("Hello, may I speak with [Contact Name]?\n\nI am an AI calling agent conducting a voter survey on behalf of the constituency office. We would like to understand your concerns regarding:\n• Road and infrastructure conditions\n• Water supply and sanitation\n• Employment opportunities\n\nYour feedback will be recorded and forwarded to the appropriate authorities. Do you have any specific concerns you would like to share?");
-  const [notifs, setNotifs] = useState({ email: true, webhook: false, slack: false, sms: false });
-  const [webhookUrl, setWebhookUrl] = useState("");
+  const [twilio, setTwilio] = useState({
+  sid: "",
+  token: "",
+  phone: ""
+});
+  const [groq, setGroq] = useState({
+  key: "",
+  model: "llama-3.3-70b-versatile"
+});
+  const [script, setScript] = useState("");
+  // const [notifs, setNotifs] = useState({ email: true, webhook: false, slack: false, sms: false });
+  // const [webhookUrl, setWebhookUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [voice, setVoice] = useState("Polly.Aditi");
 
   const handleSaveAll = async () => {
     setSaving(true);
     try {
-      await fetch(`${API}/settings/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ twilio, groq, script }),
-      });
+        const token = localStorage.getItem("token");
+
+        await fetch(`${API}/settings/save`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            twilio_sid: twilio.sid,
+            twilio_token: twilio.token,
+            twilio_phone: twilio.phone,
+
+            groq_key: groq.key,
+            groq_model: groq.model,
+
+            script,
+            voice,
+          }),
+        });
       toast.success("All settings saved!");
     } catch {
       toast.error("Failed to save settings.");
@@ -35,17 +55,73 @@ export default function SettingsPage() {
     }
   };
 
-  const testTwilio = async () => {
-    const r = await fetch(`${API}/settings/test-twilio`, { method: "POST" });
-    const d = await r.json();
-    d.ok ? toast.success("Twilio connection verified! ✓") : toast.error(`Twilio error: ${d.error}`);
+const testTwilio = async () => {
+  const token = localStorage.getItem("token");
+
+  const r = await fetch(`${API}/settings/test-twilio`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const d = await r.json();
+  d.ok
+    ? toast.success("Twilio connection verified! ✓")
+    : toast.error(`Twilio error: ${d.error}`);
+};
+
+const testGroq = async () => {
+  const token = localStorage.getItem("token");
+
+  const r = await fetch(`${API}/settings/test-groq`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const d = await r.json();
+  d.ok
+    ? toast.success("Groq API key verified! ✓")
+    : toast.error(`Groq error: ${d.error}`);
+};
+
+  useEffect(() => {
+  const loadSettings = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API}/settings`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+
+      setTwilio({
+        sid: data.twilio?.sid || "",
+        token: data.twilio?.token || "",
+        phone: data.twilio?.phone || ""
+      });
+
+      setGroq({
+        key: data.groq?.key || "",
+        model: data.groq?.model || "llama-3.3-70b-versatile"
+      });
+
+      setScript(data.script || "");
+
+      setVoice(
+        data.voice || "Polly.Aditi"
+      );
+
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const testGroq = async () => {
-    const r = await fetch(`${API}/settings/test-groq`, { method: "POST" });
-    const d = await r.json();
-    d.ok ? toast.success("Groq API key verified! ✓") : toast.error(`Groq error: ${d.error}`);
-  };
+  loadSettings();
+}, []);
 
   return (
     <div className="space-y-6">
@@ -81,74 +157,97 @@ export default function SettingsPage() {
           <PasswordField label="API Key" value={groq.key} onChange={v => setGroq({ ...groq, key: v })} placeholder="gsk_xxxxxxxxxxxx" />
           <div>
             <label className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold block mb-1.5">Model</label>
+            <p className="text-sm text-gray-500 mt-2">
+  Select the Groq model used for AI voice conversations.
+</p>
             <select value={groq.model} onChange={e => setGroq({ ...groq, model: e.target.value })}
-              className="w-full bg-white/[0.04] border border-white/[0.08] px-4 py-3 rounded-xl outline-none text-sm text-white focus:border-[#00d4ff]/40">
-              <option value="llama3-70b-8192">llama3-70b-8192 (Recommended)</option>
-              <option value="llama3-8b-8192">llama3-8b-8192 (Fast)</option>
-              <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
-              <option value="gemma-7b-it">gemma-7b-it</option>
+              className="w-full bg-[#111827] border border-white/[0.08] px-4 py-3 rounded-xl text-white">
+              <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+              <option value="llama3-8b-8192">llama3-8b-8192</option>
             </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {[{ l: "Max Tokens", v: "1000" }, { l: "Temperature", v: "0.3" }].map(f => (
-              <div key={f.l}>
-                <label className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold block mb-1.5">{f.l}</label>
-                <input defaultValue={f.v} className="w-full bg-white/[0.04] border border-white/[0.08] px-4 py-3 rounded-xl outline-none text-sm text-white focus:border-[#00d4ff]/40 transition-colors" />
-              </div>
-            ))}
           </div>
           <button onClick={testGroq}
             className="w-full py-2.5 text-sm rounded-xl border border-white/[0.08] text-slate-300 hover:border-[#00d4ff]/40 hover:text-[#00d4ff] transition-all">🔌 Test API Key</button>
         </div>
-        {/* STT / TTS */}
-        <div className="bg-[#0d1520] border border-white/[0.07] rounded-2xl p-6 space-y-5">
-          <div className="flex items-center gap-3 pb-3 border-b border-white/[0.06]">
-            <span className="text-2xl">🎙️</span>
-            <div><h2 className="text-base font-semibold text-white">Voice Services</h2><p className="text-xs text-slate-500">STT & TTS provider</p></div>
-          </div>
-          <div>
-            <p className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold mb-3">Speech-to-Text (STT)</p>
-            <div className="space-y-2">
-              {["Google Whisper", "Azure Speech", "AWS Transcribe"].map(opt => (
-                <label key={opt} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${stt === opt ? "bg-[#00d4ff]/5 border-[#00d4ff]/20" : "bg-white/[0.02] border-white/[0.05] hover:border-white/[0.1]"}`}>
-                  <input type="radio" name="stt" checked={stt === opt} onChange={() => setStt(opt)} className="accent-cyan-400" />
-                  <span className="text-sm text-slate-300 flex-1">{opt}</span>
-                  {stt === opt && <span className="text-[10px] text-[#00d4ff] font-semibold">Active</span>}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold mb-3">Text-to-Speech (TTS)</p>
-            <div className="space-y-2">
-              {["Google Sarvam", "Azure Neural TTS", "AWS Polly"].map(opt => (
-                <label key={opt} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${tts === opt ? "bg-[#00d4ff]/5 border-[#00d4ff]/20" : "bg-white/[0.02] border-white/[0.05] hover:border-white/[0.1]"}`}>
-                  <input type="radio" name="tts" checked={tts === opt} onChange={() => setTts(opt)} className="accent-cyan-400" />
-                  <span className="text-sm text-slate-300 flex-1">{opt}</span>
-                  {tts === opt && <span className="text-[10px] text-[#00d4ff] font-semibold">Active</span>}
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* Notifications */}
-        <div className="bg-[#0d1520] border border-white/[0.07] rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-3 pb-3 border-b border-white/[0.06]">
-            <span className="text-2xl">🔔</span>
-            <div><h2 className="text-base font-semibold text-white">Notifications</h2><p className="text-xs text-slate-500">Alert preferences</p></div>
-          </div>
-          {[{ k: "email", l: "Email Notifications", d: "Get notified on call completions" }, { k: "webhook", l: "Webhook Alerts", d: "POST events to your server" }, { k: "slack", l: "Slack Integration", d: "Send alerts to a Slack channel" }, { k: "sms", l: "SMS Alerts", d: "Critical event alerts via SMS" }].map(n => (
-            <div key={n.k} className="flex items-center justify-between py-2 border-b border-white/[0.04]">
-              <div><p className="text-sm font-medium text-white">{n.l}</p><p className="text-xs text-slate-500 mt-0.5">{n.d}</p></div>
-              <Toggle checked={notifs[n.k]} onChange={v => { setNotifs({ ...notifs, [n.k]: v }); toast(v ? `${n.l} enabled` : `${n.l} disabled`, { icon: v ? "✅" : "🔕" }); }} />
-            </div>
-          ))}
-          <InputField label="Webhook URL" value={webhookUrl} onChange={setWebhookUrl} placeholder="https://your-server.com/webhook" />
-          <button onClick={() => toast.success("Test webhook sent!")}
-            className="w-full py-2.5 text-sm rounded-xl border border-white/[0.08] text-slate-300 hover:border-[#00d4ff]/40 hover:text-[#00d4ff] transition-all">🧪 Send Test Webhook</button>
-        </div>
-      </div>
-      {/* Script editor */}
+
+        
+
+          {/* Voice Choice */}
+  <div className="bg-[#0d1520] border border-white/[0.07] rounded-2xl p-6 space-y-5">
+
+  <div className="flex items-center gap-3 pb-3 border-b border-white/[0.06]">
+    <span className="text-2xl">🎙️</span>
+
+    <div>
+      <h2 className="text-base font-semibold text-white">
+        Voice Configuration
+      </h2>
+
+      <p className="text-xs text-slate-500">
+        Configure the AI calling voice
+      </p>
+    </div>
+  </div>
+
+  {/* Voice Selection */}
+  <div>
+    <p className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold mb-3">
+      Voice Selection
+    </p>
+
+    <select
+      value={voice}
+      onChange={(e) => setVoice(e.target.value)}
+      className="w-full bg-[#111827] border border-white/[0.08] px-4 py-3 rounded-xl text-white"
+    >
+      <option value="Polly.Aditi">Aditi (Female)</option>
+      <option value="Polly.Raveena">Raveena (Female)</option>
+      <option value="Polly.Joanna">Joanna (Female)</option>
+      <option value="Polly.Matthew">Matthew (Male)</option>
+      <option value="Polly.Brian">Brian (Male)</option>
+    </select>
+
+    <p className="text-xs text-slate-500 mt-2">
+      Select the voice used by the AI agent during outbound calls.
+    </p>
+  </div>
+
+  {/* Current Voice Technology */}
+  <div className="border-t border-white/[0.06] pt-4 space-y-3">
+
+    <div>
+      <p className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold">
+        Speech-to-Text
+      </p>
+
+      <p className="text-sm text-white mt-1">
+        Twilio Speech Recognition
+      </p>
+
+      <p className="text-xs text-slate-500">
+        Converts voter speech into text during calls.
+      </p>
+    </div>
+
+    <div>
+      <p className="text-[10px] tracking-widest text-slate-500 uppercase font-semibold">
+        Text-to-Speech
+      </p>
+
+      <p className="text-sm text-white mt-1">
+        Amazon Polly
+      </p>
+
+      <p className="text-xs text-slate-500">
+        Converts AI responses into natural voice audio.
+      </p>
+    </div>
+
+  </div>
+
+</div>
+
+ {/* Script editor */}
       <div className="bg-[#0d1520] border border-white/[0.07] rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
@@ -173,6 +272,9 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      </div>
+     
     </div>
   );
 }

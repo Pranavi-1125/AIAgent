@@ -21,6 +21,7 @@ const NAV_LINKS = [
 ];
 
 export default function Sidebar({ open, setOpen }) {
+    const user = JSON.parse(localStorage.getItem("user"));
   return (
     <>
       {open && (
@@ -91,11 +92,9 @@ export default function Sidebar({ open, setOpen }) {
 
           <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/[0.03]">
 
-            <img
-              src="https://i.pravatar.cc/32"
-              className="w-8 h-8 rounded-full ring-2 ring-[#00d4ff]/30"
-              alt=""
-            />
+           <div className="w-8 h-8 rounded-full bg-[#00d4ff]/20 flex items-center justify-center text-[#00d4ff] font-semibold">
+  {user?.name?.charAt(0)?.toUpperCase() || "P"}
+</div>
 
             <div className="flex-1 min-w-0">
 

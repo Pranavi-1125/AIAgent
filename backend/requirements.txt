@@ -39,6 +39,7 @@ twilio==9.0.5
 openai-whisper
 torch
 soundfile
+ffmpeg-python
 
 # -----------------------------
 # Text-to-Speech
@@ -49,3 +50,10 @@ gTTS==2.5.1
 # Audio / Processing
 # -----------------------------
 numpy==1.26.4
+groq==0.8.0
+pandas==2.2.2
+
+python-jose
+passlib[bcrypt]
+bcrypt==4.0.1
+python-multipart
