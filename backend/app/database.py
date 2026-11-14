@@ -19,10 +19,10 @@ load_dotenv()
 # DATABASE URL
 # =============================================================================
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:Pranavi@localhost/electionai"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 
 # =============================================================================
