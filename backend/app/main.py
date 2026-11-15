@@ -37,16 +37,19 @@ app = FastAPI(
 # CORS
 # =============================================================================
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:5173",
-    "http://localhost:5174"
-],
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "https://aiagent.mpranavi1125.workers.dev"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Register Calls API Router
 app.include_router(call_routes.router, prefix="/calls", tags=["Calls"])
