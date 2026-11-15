@@ -256,18 +256,18 @@ def get_settings(
         }
 
     return {
-        "twilio": {
-            "sid": settings.twilio_sid,
-            "token": settings.twilio_token,
-            "phone": settings.twilio_phone
-        },
-        "groq": {
-            "key": settings.groq_key,
-            "model": settings.groq_model
-        },
-        "script": settings.default_script,
-        "voice": settings.voice
-    }
+    "twilio": {
+        "sid": "",
+        "token": "",
+        "phone": settings.twilio_phone
+    },
+    "groq": {
+        "key": "",
+        "model": settings.groq_model
+    },
+    "script": settings.default_script,
+    "voice": settings.voice
+}
 
 
 @app.post("/settings/save")
@@ -276,7 +276,6 @@ def save_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
     settings = db.query(UserSettings).filter(
         UserSettings.user_id == current_user.id
     ).first()
@@ -287,12 +286,20 @@ def save_settings(
         )
         db.add(settings)
 
-    settings.twilio_sid = payload.twilio_sid
-    settings.twilio_token = payload.twilio_token
-    settings.twilio_phone = payload.twilio_phone
+    if payload.twilio_sid:
+        settings.twilio_sid = payload.twilio_sid
 
-    settings.groq_key = payload.groq_key
-    settings.groq_model = payload.groq_model
+    if payload.twilio_token:
+        settings.twilio_token = payload.twilio_token
+
+    if payload.twilio_phone:
+        settings.twilio_phone = payload.twilio_phone
+
+    if payload.groq_key:
+        settings.groq_key = payload.groq_key
+
+    if payload.groq_model:
+        settings.groq_model = payload.groq_model
 
     settings.default_script = payload.script
     settings.voice = payload.voice
@@ -669,12 +676,21 @@ def get_analytics_trends(
 # =============================================================================
 
 @app.get("/calls/export/csv")
-def export_calls_csv(db: Session = Depends(get_db)):
-    calls = db.query(CallLog).all()
+def export_calls_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    calls = (
+        db.query(CallLog)
+        .join(Campaign)
+        .filter(Campaign.user_id == current_user.id)
+        .all()
+    )
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Call ID", "Voter Name", "Phone", "Campaign", "Status", "Duration (Sec)", "Sentiment", "Summary", "Transcript"])
-    
+
     for c in calls:
         anal = c.analysis
         writer.writerow([
@@ -688,7 +704,7 @@ def export_calls_csv(db: Session = Depends(get_db)):
             anal.summary if anal else "",
             c.full_transcript or ""
         ])
-        
+
     output.seek(0)
     return StreamingResponse(
         io.StringIO(output.getvalue()),
